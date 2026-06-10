@@ -90,7 +90,9 @@ from database import (
     get_club_photos,
     delete_club_photo,
     get_all_approved_reservations,
-    mark_reminder_sent
+    mark_reminder_sent,
+    get_pending_approvals,
+    save_receipt_file
 )
 
 
@@ -361,7 +363,7 @@ async def create_time_keyboard(
 
         if time_text in reserved:
 
-            if reserved[time_text] == "pending":
+            if reserved[time_text] in ["pending", "waiting_admin"]:
                 button_text = f"🔒 {time_text}"
 
             elif reserved[time_text] == "approved":
@@ -879,8 +881,11 @@ async def receive_receipt(
         reply_markup=keyboard
     )
 
-    await mark_receipt_sent(
-        reservation[0]
+    file_id = message.photo[-1].file_id
+
+    await save_receipt_file(
+        reservation[0],
+        file_id
     )
 
     await message.answer(
@@ -1139,7 +1144,10 @@ async def my_reservations(
         status = reservation[4]
 
         if status == "pending":
-            status_text = "🟡 در انتظار تایید"
+             status_text = "🟠 در انتظار ارسال فیش"
+
+        elif status == "waiting_admin":
+            status_text = "🟡 در انتظار تایید ادمین"
 
         elif status == "approved":
             status_text = "🟢 تایید شده"
@@ -2391,7 +2399,7 @@ https://maps.app.goo.gl/kDDuCp6kfCUDhT159
 
 📞 تلفن تماس:
 
-09145805676
++989145805676
 
 📷 اینستاگرام:
 
@@ -2760,7 +2768,69 @@ async def club_rules(message: Message):
     )
 
 
-    
+
+
+@dp.message(F.text == "⏳ رزروهای تایید نشده")
+async def show_pending_reservations(message: Message):
+
+    reservations = await get_pending_approvals()
+
+    if not reservations:
+        await message.answer(
+            "✅ رزرو تایید نشده‌ای وجود ندارد."
+        )
+        return
+
+    for reservation in reservations:
+
+        reservation_id = reservation[0]
+
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="✅ تایید",
+                        callback_data=f"approve_{reservation_id}"
+                    ),
+                    InlineKeyboardButton(
+                        text="❌ رد",
+                        callback_data=f"reject_{reservation_id}"
+                    )
+                ]
+            ]
+        )
+
+        user = await get_user(reservation[1])
+
+        file_id = reservation[12]
+
+        await bot.send_photo(
+            chat_id=message.chat.id,
+            photo=file_id,
+            caption=f"""
+        📌 رزرو شماره {reservation_id}
+
+        👤 نام:
+        {user[2]}
+
+        📞 شماره تماس:
+        {user[1]}
+
+        🎁 میزان تخفیف:
+        {reservation[6]}٪
+
+        📅 تاریخ:
+        {reservation[2]}
+
+        ⏰ ساعت:
+        {reservation[3]}
+        """,
+            reply_markup=keyboard
+        )
+
+
+
+
 
 async def main():
 

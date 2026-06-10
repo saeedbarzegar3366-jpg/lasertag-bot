@@ -145,7 +145,11 @@ async def get_reservation(
         FROM reservations
         WHERE reserve_date=?
         AND reserve_time=?
-        AND status IN ('pending','approved')
+        AND status IN (
+            'pending',
+            'waiting_admin',
+            'approved'
+        )
         """,
         (
             reserve_date,
@@ -575,6 +579,14 @@ async def update_reservations_table():
         try:
             await db.execute("""
             ALTER TABLE reservations
+            ADD COLUMN receipt_file_id TEXT
+            """)
+        except:
+            pass
+
+        try:
+            await db.execute("""
+            ALTER TABLE reservations
             ADD COLUMN discount_code TEXT
             """)
         except:
@@ -760,7 +772,8 @@ async def mark_receipt_sent(
         await db.execute(
             """
             UPDATE reservations
-            SET receipt_sent=1
+            SET receipt_sent=1,
+                status='waiting_admin'
             WHERE id=?
             """,
             (reservation_id,)
@@ -1094,6 +1107,46 @@ async def mark_reminder_sent(
             WHERE id=?
             """,
             (reservation_id,)
+        )
+
+        await db.commit()
+
+
+
+async def get_pending_approvals():
+
+    async with aiosqlite.connect(DB_NAME) as db:
+
+        cursor = await db.execute("""
+            SELECT *
+            FROM reservations
+            WHERE status='waiting_admin'
+        """)
+
+        return await cursor.fetchall()
+
+
+
+
+async def save_receipt_file(
+    reservation_id,
+    file_id
+):
+
+    async with aiosqlite.connect(DB_NAME) as db:
+
+        await db.execute(
+            """
+            UPDATE reservations
+            SET receipt_file_id=?,
+                receipt_sent=1,
+                status='waiting_admin'
+            WHERE id=?
+            """,
+            (
+                file_id,
+                reservation_id
+            )
         )
 
         await db.commit()
