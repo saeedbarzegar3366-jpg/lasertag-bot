@@ -84,7 +84,7 @@ from database import (
     create_discount_usage_table,
     get_all_reservations_with_users,
     delete_reservation_by_id,
-    delete_old_reservations,
+    expire_old_reservations,
     create_club_photos_table,
     add_club_photo,
     get_club_photos,
@@ -1157,6 +1157,9 @@ async def my_reservations(
 
         elif status == "rejected":
             status_text = "🔴 رد شده"
+
+        elif status == "expired":
+            status_text = "⏳ تاریخ این رزرو گذشته"
 
         else:
             status_text = status
@@ -2846,7 +2849,7 @@ async def main():
 
     await update_reservations_table()
 
-    await delete_old_reservations()
+    await expire_old_reservations()
 
     await create_club_photos_table()
 
