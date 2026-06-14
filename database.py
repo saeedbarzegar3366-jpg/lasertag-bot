@@ -989,18 +989,20 @@ async def delete_reservation_by_id(
 
 from datetime import datetime
 
-async def delete_old_reservations():
+async def expire_old_reservations():
 
-    today = datetime.now().strftime(
-        "%Y-%m-%d"
+    today = jdatetime.date.today().strftime(
+        "%Y/%m/%d"
     )
 
     async with aiosqlite.connect(DB_NAME) as db:
 
         await db.execute(
             """
-            DELETE FROM reservations
+            UPDATE reservations
+            SET status='expired'
             WHERE reserve_date < ?
+            AND status='approved'
             """,
             (today,)
         )
