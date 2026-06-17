@@ -991,24 +991,48 @@ from datetime import datetime
 
 async def expire_old_reservations():
 
-    today = jdatetime.date.today().strftime(
-        "%Y/%m/%d"
-    )
+    now = datetime.now()
 
     async with aiosqlite.connect(DB_NAME) as db:
 
-        await db.execute(
-            """
-            UPDATE reservations
-            SET status='expired'
-            WHERE reserve_date < ?
-            AND status='approved'
-            """,
-            (today,)
-        )
+        cursor = await db.execute("""
+        SELECT id, reserve_date, reserve_time
+        FROM reservations
+        WHERE status='approved'
+        """)
+
+        reservations = await cursor.fetchall()
+
+        for reservation in reservations:
+
+            reservation_id = reservation[0]
+            reserve_date = reservation[1]
+            reserve_time = reservation[2]
+
+            try:
+
+                jalali_dt = jdatetime.datetime.strptime(
+                    f"{reserve_date} {reserve_time}",
+                    "%Y/%m/%d %H:%M"
+                )
+
+                reserve_datetime = jalali_dt.togregorian()
+
+                if reserve_datetime < now:
+
+                    await db.execute(
+                        """
+                        UPDATE reservations
+                        SET status='expired'
+                        WHERE id=?
+                        """,
+                        (reservation_id,)
+                    )
+
+            except:
+                pass
 
         await db.commit()
-
 
 
 async def create_club_photos_table():

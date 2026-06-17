@@ -2272,6 +2272,7 @@ async def manage_reservations(
     state: FSMContext
 ):
 
+    await expire_old_reservations()
     reservations = await get_all_reservations_with_users()
 
     reservations = [
