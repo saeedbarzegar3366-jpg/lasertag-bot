@@ -23,6 +23,9 @@ class ReservationState(StatesGroup):
     waiting_cancel_id = State()
     waiting_delete_user = State()
 
+    waiting_manual_date = State()
+    waiting_manual_time = State()
+    waiting_manual_info = State()
 
 
 class AdminState(StatesGroup):
