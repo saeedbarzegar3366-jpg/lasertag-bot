@@ -357,9 +357,28 @@ async def create_time_keyboard(
     rows = []
     current_row = []
 
+    now = datetime.now()
+
+    today_jalali = jdatetime.datetime.fromgregorian(
+        datetime=now
+    ).strftime("%Y/%m/%d")
+
     for hour in range(10, 24):
 
         time_text = f"{hour}:00"
+
+        if reserve_date == today_jalali and hour <= now.hour:
+            button_text = f"⏰ {time_text}"
+
+            current_row.append(
+                KeyboardButton(text=button_text)
+            )
+
+            if len(current_row) == 3:
+                rows.append(current_row)
+                current_row = []
+
+            continue
 
         if time_text in reserved:
 
@@ -435,9 +454,17 @@ async def reserve(
     )
 
     await message.answer(
-        "تاریخ مورد نظر را انتخاب کنید",
+    """ℹ️ توجه:
+
+    هر ساعت رزرو شامل ۲ سانس بازی می‌باشد (هر سانس ۱۵ دقیقه است و هر بازی شامل ۲ سانس می‌باشد).
+
+    در صورتی که قصد دارید بیشتر از ۲ سانس بازی کنید، لطفاً دو یا چند ساعت متوالی را رزرو نمایید
+    برای مثال، برای ۴ سانس بازی باید ۲ ساعت پشت سر هم رزرو کنید
+
+    📅 حالا تاریخ مورد نظر خود را انتخاب کنید:""",
         reply_markup=create_days_keyboard()
     )
+
 
 @dp.message(ReservationState.selected_date)
 async def select_date(
@@ -476,10 +503,12 @@ async def select_date(
 
         await message.answer(
             """
-    ❌ شما برای این روز به سقف مجاز رسیده‌اید.
+        ⛔ شما امروز به سقف مجاز رزرو رسیده‌اید.
 
-    هر کاربر حداکثر 5 رزرو در هر روز می‌تواند ثبت کند.
-    """
+        هر کاربر حداکثر می‌تواند در طول یک روز ۵ رزرو ثبت کند و شما امروز ۵ رزرو خود را انجام داده‌اید.
+
+        لطفاً پس از شروع روز جدید (ساعت ۰۰:۰۰) دوباره برای ثبت رزرو اقدام کنید.
+        """
         )
 
         return
@@ -524,6 +553,14 @@ async def select_time(
     message: Message,
     state: FSMContext
 ):
+
+    if message.text.startswith("⏰"):
+
+        await message.answer(
+            "⛔ این ساعت گذشته و قابل رزرو نیست."
+        )
+
+        return
 
     if message.text == "🔙 بازگشت":
 
@@ -1126,6 +1163,8 @@ async def my_reservations(
     message: Message
 ):
 
+    await expire_old_reservations()
+    
     reservations = await get_all_user_reservations(
         message.from_user.id
     )
@@ -2262,7 +2301,106 @@ async def admin_discount_message(
 
 
 
+@dp.message(
+    F.text == "➕ رزرو تلفنی"
+)
+async def manual_reservation_start(
+    message: Message,
+    state: FSMContext
+):
 
+    await state.set_state(
+        ReservationState.waiting_manual_date
+    )
+
+    await message.answer(
+        "📅 تاریخ مورد نظر را انتخاب کنید",
+        reply_markup=create_days_keyboard()
+    )
+
+
+
+@dp.message(
+    ReservationState.waiting_manual_date
+)
+async def manual_reservation_date(
+    message: Message,
+    state: FSMContext
+):
+
+    await state.update_data(
+        manual_date=message.text
+    )
+
+    await state.set_state(
+        ReservationState.waiting_manual_time
+    )
+
+    await message.answer(
+        "🕐 ساعت مورد نظر را انتخاب کنید",
+        reply_markup=await create_time_keyboard(
+            message.text
+        )
+    )
+
+
+
+@dp.message(
+    ReservationState.waiting_manual_time
+)
+async def manual_reservation_time(
+    message: Message,
+    state: FSMContext
+):
+
+    await state.update_data(
+        manual_time=message.text
+    )
+
+    await state.set_state(
+        ReservationState.waiting_manual_info
+    )
+
+    await message.answer(
+        """👤 اطلاعات مشتری را وارد کنید
+
+مثال:
+علی محمدی - 09123456789"""
+    )
+
+
+
+@dp.message(
+    ReservationState.waiting_manual_info
+)
+async def manual_reservation_info(
+    message: Message,
+    state: FSMContext
+):
+
+    data = await state.get_data()
+
+    await add_reservation(
+        user_id=0,
+        reserve_date=data["manual_date"],
+        reserve_time=data["manual_time"],
+        status="approved"
+    )
+
+    await state.clear()
+
+    await message.answer(
+        f"""
+✅ رزرو تلفنی ثبت شد
+
+📅 {data['manual_date']}
+⏰ {data['manual_time']}
+""",
+        reply_markup=admin_menu
+    )
+
+
+    
 
 @dp.message(
     F.text == "📋 مدیریت رزروها"

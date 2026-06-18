@@ -72,6 +72,9 @@ admin_menu = ReplyKeyboardMarkup(
             KeyboardButton(text="📋 مدیریت رزروها")
         ],
         [
+            KeyboardButton(text="➕ رزرو تلفنی")
+        ],
+        [
             KeyboardButton(text="⏳ رزروهای تایید نشده")
         ],
         [

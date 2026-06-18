@@ -784,28 +784,32 @@ async def mark_receipt_sent(
 
 async def get_user_reservations_count(
     user_id,
-    reserve_date
+    reserve_date=None
 ):
 
     async with aiosqlite.connect(DB_NAME) as db:
+
+        today = datetime.now().strftime(
+            "%Y-%m-%d"
+        )
 
         cursor = await db.execute(
             """
             SELECT COUNT(*)
             FROM reservations
             WHERE user_id=?
-            AND reserve_date=?
+            AND date(created_at)=?
             """,
             (
                 user_id,
-                reserve_date
+                today
             )
         )
 
         result = await cursor.fetchone()
 
         return result[0]
-
+        
 
 
 async def create_discount_usage_table():
@@ -1017,6 +1021,15 @@ async def expire_old_reservations():
                 )
 
                 reserve_datetime = jalali_dt.togregorian()
+                
+                print(
+                    "CHECK:",
+                    reservation_id,
+                    reserve_date,
+                    reserve_time,
+                    reserve_datetime,
+                    now
+                )
 
                 if reserve_datetime < now:
 
